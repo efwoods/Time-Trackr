@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TimeTrackr</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/axios@1.6.7/dist/axios.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
+</head>
+<body>
+  <div id="root" class="container mx Borough-16"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const App = () => {
+      const [token, setToken] = useState(localStorage.getItem('token') || '');
+      const [user, setUser] = useState(null);
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [categories, setCategories] = useState([]);
+      const [projects, setProjects] = useState([]);
+      const [timeEntries, setTimeEntries] = useState([]);
+      const [llmSummaries, setLlmSummaries] = useState([]);
+      const [categoryName, setCategoryName] = useState('');
+      const [projectName, setProjectName] = useState('');
+      const [selectedCategory, setSelectedCategory] = useState('');
+      const [hours, setHours] = useState('');
+      const [description, setDescription] = useState('');
+      const [summary, setSummary] = useState('');
+
+      const api = axios.create({
+        baseURL: 'http://localhost:8000',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      useEffect(() => {
+        if (token) {
+          api.get('/auth/me').then(res => setUser(res.data)).catch(() => setToken(''));
+          api.get('/categories').then(res => setCategories(res.data));
+          api.get('/projects').then(res => setProjects(res.data));
+          api.get('/time-entries').then(res => setTimeEntries(res.data));
+          api.get('/llm-summaries').then(res => setLlmSummaries(res.data));
+        }
+      }, [token]);
+
+      const handleLogin = async () => {
+        try {
+          const res = await api.post('/auth/token', new URLSearchParams({ username: email, password }));
+          setToken(res.data.access_token);
+          localStorage.setItem('token', res.data.access_token);
+        } catch (err) {
+          alert('Login failed');
+        }
+      };
+
+      const handleRegister = async () => {
+        try {
+          await api.post('/auth/register', { email, password });
+          handleLogin();
+        } catch (err) {
+          alert('Registration failed');
+        }
+      };
+
+      const handleCreateCategory = async () => {
+        try {
+          const res = await api.post('/categories', { name: categoryName });
+          setCategories([...categories, res.data]);
+          setCategoryName('');
+        } catch (err) {
+          alert('Failed to create category');
+        }
+      };
+
+      const handleCreateProject = async () => {
+        try {
+          const res = await api.post('/projects', { name: projectName, category_id: parseInt(selectedCategory) });
+          setProjects([...projects, res.data]);
+          setProjectName('');
+          setSelectedCategory('');
+        } catch (err) {
+          alert('Failed to create project');
+        }
+      };
+
+      const handleCreateTimeEntry = async () => {
+        try {
+          const res = await api.post('/time-entries', { project_id: parseInt(selectedCategory), hours: parseFloat(hours), description });
+          setTimeEntries([...timeEntries, res.data]);
+          setHours('');
+          setDescription('');
+          setSelectedCategory('');
+        } catch (err) {
+          alert('Failed to create time entry');
+        }
+      };
+
+      const handleCreateLLMSummary = async () => {
+        try {
+          const res = await api.post('/llm-summaries');
+          setLlmSummaries([...llmSummaries, res.data]);
+        } catch (err) {
+          alert('Failed to fetch LLM summary');
+        }
+      };
+
+      if (!token) {
+        return (
+          <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
+            <h1 className="text-2xl font-bold mb-4">TimeTrackr</h1>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="Email"
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Password"
+              className="w-full p-2 mb-4 border rounded"
+            />
+            <button onClick={handleLogin} className="w-full bg-blue-500 text-white p-2 rounded mb-2">Login</button>
+            <button onClick={handleRegister} className="w-full bg-green-500 text-white p-2 rounded">Register</button>
+          </div>
+        );
+      }
+
+      return (
+        <div className="max-w-4xl mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
+          <h1 className="text-2xl font-bold mb-4">TimeTrackr Dashboard</h1>
+          <button onClick={() => { setToken(''); localStorage.removeItem('token'); }} className="bg-red-500 text-white p-2 rounded mb-4">Logout</button>
+
+          <h2 className="text-xl font-semibold mb-2">Create Category</h2>
+          <input
+            value={categoryName}
+            onChange={e => setCategoryName(e.target.value)}
+            placeholder="Category Name"
+            className="w-full p-2 mb-4 border rounded"
+          />
+          <button onClick={handleCreateCategory} className="bg-blue-500 text-white p-2 rounded mb-4">Add Category</button>
+
+          <h2 className="text-xl font-semibold mb-2">Create Project</h2>
+          <input
+            value={projectName}
+            onChange={e => setProjectName(e.target.value)}
+            placeholder="Project Name"
+            className="w-full p-2 mb-4 border rounded"
+          />
+          <select
+            value={selectedCategory}
+            onChange={e => setSelectedCategory(e.target.value)}
+            className="w-full p-2 mb-4 border rounded"
+          >
+            <option value="">Select Category</option>
+            {categories.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
+          <button onClick={handleCreateProject} className="bg-blue-500 text-white p-2 rounded mb-4">Add Project</button>
+
+          <h2 className="text-xl font-semibold mb-2">Log Time</h2>
+          <select
+            value={selectedCategory}
+            onChange={e => setSelectedCategory(e.target.value)}
+            className="w-full p-2 mb-4 border rounded"
+          >
+            <option value="">Select Project</option>
+            {projects.map(proj => (
+              <option key={proj.id} value={proj.id}>{proj.name}</option>
+            ))}
+          </select>
+          <input
+            value={hours}
+            onChange={e => setHours(e.target.value)}
+            placeholder="Hours"
+            type="number"
+            step="0.1"
+            className="w-full p-2 mb-4 border rounded"
+          />
+          <input
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Description"
+            className="w-full p-2 mb-4 border rounded"
+          />
+          <button onClick={handleCreateTimeEntry} className="bg-blue-500 text-white p-2 rounded mb-4">Log Time</button>
+
+          <h2 className="text-xl font-semibold mb-2">Fetch LLM Summary</h2>
+          <button onClick={handleCreateLLMSummary} className="bg-blue-500 text-white p-2 rounded mb-4">Fetch Summary</button>
+
+          <h2 className="text-xl font-semibold mb-2">Time Entries</h2>
+          <ul className="mb-4">
+            {timeEntries.map(entry => (
+              <li key={entry.id} className="p-2 border-b">
+                {entry.hours} hours on {projects.find(p => p.id === entry.project_id)?.name} - {entry.description} ({new Date(entry.timestamp).toLocaleString()})
+              </li>
+            ))}
+          </ul>
+
+          <h2 className="text-xl font-semibold mb-2">LLM Summaries</h2>
+          <ul className="mb-4">
+            {llmSummaries.map(summary => (
+              <li key={summary.id} className="p-2 border-b">
+                {summary.summary} ({new Date(summary.timestamp).toLocaleString()})
+              </li>
+            ))}
+          </ul>
+
+          <h2 className="text-xl font-semibold mb-2">Category Summary</h2>
+          <button onClick={() => api.get('/time-entries/summary').then(res => alert(JSON.stringify(res.data)))} className="bg-blue-500 text-white p-2 rounded">
+            View Summary
+          </button>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:80"
+    environment:
+      - DATABASE_URL=postgresql://timetrackr:timetrackr@db:5432/timetrackr
+      - JWT_SECRET=your-secret-key-change-this
+      - LLM_API_URL=http://external-llm-api.com/summary
+      - LLM_API_KEY=your-llm-api-key
+    depends_on:
+      - db
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=timetrackr
+      - POSTGRES_PASSWORD=timetrackr
+      - POSTGRES_DB=timetrackr
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:
